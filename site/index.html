@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="theme-color" content="#13294b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Weather now">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>UK weather now – where's dry and sunny</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--mute:#636b7a;--line:#e2e5ea;--acc:#0b5cad;--navy:#13294b;--rain:#1c64c4;--dry:#2f9e44;--sun:#e8a100;--bad:#b42318;--warn:#b35900}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:#fff;padding:12px 16px 12px;padding-top:max(12px,env(safe-area-inset-top))}
+header h1{margin:0;font-size:20px}header p{margin:3px 0 0;font-size:13px;opacity:.85}
+main{max-width:1100px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+h2{font-size:16px;margin:0 0 8px}
+button{font:inherit;border:1px solid #c5cbd5;background:#fff;color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:44px}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+input[type=text]{font:inherit;font-size:16px;padding:8px 10px;border:1px solid #c5cbd5;border-radius:8px;min-width:0;min-height:44px}
+.note{font-size:13px;color:var(--mute)}.err{color:var(--bad)}
+#nearBtn{width:100%;min-height:58px;font-size:19px;font-weight:700;background:var(--acc);color:#fff;border:0}
+.searchrow{display:flex;gap:8px;margin-top:8px}.searchrow input{flex:1}
+#placeLine{margin-top:8px;font-size:14px}#placeLine a{color:var(--acc);margin-left:6px}
+.rad{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+#prompt{background:#eef5ff;border:1px solid #c9dcf5;border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.errbox{background:#fdecea;border:1px solid #f3b8b2;color:#7a1a12;border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid>*{min-width:0}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+/* now card */
+#nowCard{border-width:2px}
+.nowtop{display:flex;align-items:center;gap:12px}
+.big{font-size:44px;line-height:1}
+.nowstate{font-size:22px;font-weight:700}
+.nowsub{color:var(--mute);font-size:14px}
+.temp{margin-left:auto;text-align:right;font-size:30px;font-weight:700}
+.temp small{display:block;font-size:12px;font-weight:400;color:var(--mute)}
+.key{font-size:18px;font-weight:700;margin:12px 0 4px;padding:10px 12px;border-radius:10px;background:#f2f7f2}
+.key.wet{background:#eaf2fd}
+.line2{font-size:15px;margin:6px 0}
+.conf{font-size:12.5px;color:var(--mute);margin-top:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{background:#f2f4f7;border-radius:999px;padding:4px 10px;font-size:13px}
+/* lists */
+ul.spots{list-style:none;margin:0;padding:0}
+ul.spots li{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+ul.spots li:first-child{border-top:0}
+.dotc{width:14px;height:14px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.2)}
+.sname{flex:1;min-width:0}.sname b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sname span{font-size:13px;color:var(--mute)}
+.sdist{font-size:13px;text-align:right;white-space:nowrap}
+h3{font-size:14px;margin:10px 0 4px;color:var(--mute);font-weight:600}
+/* timeline */
+.tl{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px;scroll-snap-type:x proximity}
+.hr{flex:0 0 64px;text-align:center;background:#f7f8fa;border-radius:8px;padding:6px 2px;scroll-snap-align:start;font-size:13px}
+.hr .t{font-weight:700}.hr .ic{font-size:22px;margin:2px 0}
+.hr .bar{height:40px;display:flex;align-items:flex-end;justify-content:center;margin:4px 0}
+.hr .bar i{display:block;width:16px;background:var(--rain);border-radius:3px 3px 0 0}
+.hr .pp{color:var(--rain);font-weight:600}
+.hr.now{outline:2px solid var(--acc)}
+/* map */
+#map{height:420px;border-radius:8px;border:1px solid var(--line);background:#e8ecf0}
+.radarbar{display:flex;align-items:center;gap:8px;margin-top:8px}
+.radarbar input{flex:1}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+/* overview */
+table.ov{width:100%;border-collapse:collapse;font-size:14px}
+table.ov td,table.ov th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
+table.ov th{font-size:12.5px;color:var(--mute);font-weight:600}
+.st-rain{color:var(--rain);font-weight:700}.st-dry{color:var(--dry);font-weight:700}.st-sun{color:#b77f00;font-weight:700}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #c5cbd5;border-top-color:var(--acc);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+footer{font-size:12.5px;color:var(--mute);padding:4px 4px 30px}
+footer a{color:var(--mute)}
+@media(max-width:640px){main{padding:8px}.card{padding:11px}#map{height:340px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>UK weather now</h1>
+  <p id="hdr">Where's dry, where's sunny, and for how long</p>
+</header>
+<main>
+  <section class="card">
+    <button id="nearBtn">📍 Near me</button>
+    <div class="searchrow">
+      <input type="text" id="placeInput" placeholder="…or postcode / town" aria-label="Postcode or town" enterkeyhint="search">
+      <button id="placeGo">Go</button>
+    </div>
+    <div id="placeLine" class="note"></div>
+  </section>
+
+  <div id="prompt">Tap <b>📍 Near me</b> or type a postcode or town. You'll see whether it's raining there, how long until that changes, and the nearest dry and sunny places. The UK overview below works straight away.</div>
+  <div id="errBox" class="errbox" hidden></div>
+
+  <section class="card" id="nowCard" hidden>
+    <div id="nowBody"></div>
+  </section>
+
+  <section class="card" id="spotCard" hidden>
+    <h2 id="spotTitle">Nearest dry and sunny places</h2>
+    <div class="rad" id="radBtns" aria-label="Search radius"></div>
+    <div id="spotBody" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card" id="mapCard" hidden>
+    <h2>Map and rain radar</h2>
+    <div id="map"></div>
+    <div class="radarbar"><button id="playBtn" aria-label="Play radar">▶</button><input type="range" id="radarSlider" min="0" max="0" value="0" aria-label="Radar time"><span id="radarTime" class="note"></span></div>
+    <div class="legend"><span><i class="dotc" style="background:var(--rain)"></i>Raining</span><span><i class="dotc" style="background:var(--dry)"></i>Dry</span><span><i class="dotc" style="background:var(--sun)"></i>Dry and sunny</span><span><i class="dotc" style="background:#5b6b8c"></i>Dry, clear night</span><span class="note">Blue shading = radar rain (last 2 hours)</span></div>
+  </section>
+
+  <section class="card" id="tlCard" hidden>
+    <h2 id="tlTitle">Next 12 hours</h2>
+    <div class="tl" id="tl"></div>
+    <div class="note">Bars show rain amount per hour; % is the chance of rain.</div>
+  </section>
+
+  <section class="card" id="ovCard">
+    <h2 id="ovTitle">UK right now</h2>
+    <div id="ovBody"><span class="spinner"></span>Checking 24 cities…</div>
+  </section>
+
+  <footer>
+    Forecasts: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> using the UK Met Office UKV 2 km model (via Open-Meteo, CC BY 4.0 / Met Office data CC BY-SA 4.0), with Open-Meteo's best-match blend for rain chances and as a fallback.
+    Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>. Map: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. Places: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0). Postcodes: <a href="https://postcodes.io/" target="_blank" rel="noopener">postcodes.io</a>.
+    Times are estimates from a forecast model, not a guarantee. Data is fetched live when you search and kept for 10 minutes.
+  </footer>
+</main>
+<script>
+(function () {
+"use strict";
+const API = "https://api.open-meteo.com/v1/forecast";
+const TTL = 10 * 60 * 1000;
+const LS = "ukWxPlace";
+const RADII = [10, 25, 50, 100];
+const WET = 0.1;        // mm per 15 min counts as rain
+const SUNNY = 450;      // seconds of sunshine in a 15-min slot (half or more) counts as sunny
+const S = {place: null, radius: 25, seq: 0};
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+window.__wx = {};
+
+// ---------- small helpers ----------
+const WMO = {0: ["Clear", "☀️", "🌙"], 1: ["Mostly clear", "🌤️", "🌙"], 2: ["Partly cloudy", "⛅", "☁️"], 3: ["Overcast", "☁️", "☁️"], 45: ["Fog", "🌫️"], 48: ["Freezing fog", "🌫️"],
+  51: ["Light drizzle", "🌦️"], 53: ["Drizzle", "🌦️"], 55: ["Heavy drizzle", "🌧️"], 56: ["Freezing drizzle", "🌧️"], 57: ["Freezing drizzle", "🌧️"],
+  61: ["Light rain", "🌦️"], 63: ["Rain", "🌧️"], 65: ["Heavy rain", "🌧️"], 66: ["Freezing rain", "🌧️"], 67: ["Freezing rain", "🌧️"],
+  71: ["Light snow", "🌨️"], 73: ["Snow", "🌨️"], 75: ["Heavy snow", "❄️"], 77: ["Snow grains", "🌨️"],
+  80: ["Light showers", "🌦️"], 81: ["Showers", "🌧️"], 82: ["Heavy showers", "⛈️"], 85: ["Snow showers", "🌨️"], 86: ["Heavy snow showers", "❄️"],
+  95: ["Thunderstorm", "⛈️"], 96: ["Thunderstorm with hail", "⛈️"], 99: ["Thunderstorm with hail", "⛈️"]};
+const wmo = (c, day) => { const w = WMO[c] || ["Unknown", "❔"]; return {txt: w[0], ic: (!day && w[2]) ? w[2] : w[1]}; };
+function miles(a, b, c, d) { const r = 3958.8, t = Math.PI / 180, x = Math.sin((c - a) * t / 2) ** 2 + Math.cos(a * t) * Math.cos(c * t) * Math.sin((d - b) * t / 2) ** 2; return 2 * r * Math.asin(Math.sqrt(x)); }
+function bearing(a, b, c, d) { const t = Math.PI / 180, y = Math.sin((d - b) * t) * Math.cos(c * t), x = Math.cos(a * t) * Math.sin(c * t) - Math.sin(a * t) * Math.cos(c * t) * Math.cos((d - b) * t); return (Math.atan2(y, x) / t + 360) % 360; }
+const compass = deg => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
+const where = (p, q) => { const m = miles(p.lat, p.lon, q.lat, q.lon); return m < 0.7 ? "here" : (m < 10 ? m.toFixed(1) : Math.round(m)) + " mi " + compass(bearing(p.lat, p.lon, q.lat, q.lon)); };
+function dur(min) { if (min >= 720) return "12 h+"; const h = Math.floor(min / 60), m = Math.round((min % 60) / 15) * 15; if (!h) return (m || 15) + " min"; return h + " h" + (m ? " " + m + " min" : ""); }
+const hm = s => s.slice(11, 16); // "2026-10-08T16:30" -> "16:30" (already UK time)
+function msg(t, bad) { $("placeLine").className = bad ? "err" : "note"; $("placeLine").textContent = t; }
+function showErr(t) { const e = $("errBox"); if (!t) { e.hidden = true; return; } e.hidden = false; e.textContent = t; }
+
+// ---------- data fetching with cache ----------
+const mem = {};
+async function getJSON(url, key) {
+  const k = key || url, now = Date.now();
+  if (mem[k] && now - mem[k].t < TTL) return mem[k].d;
+  try { const c = JSON.parse(sessionStorage.getItem("wx:" + k) || "null"); if (c && now - c.t < TTL) { mem[k] = c; return c.d; } } catch (e) {}
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 15000);
+  let r;
+  try { r = await fetch(url, {signal: ctl.signal}); } catch (e) { throw new Error(e.name === "AbortError" ? "timed out" : "network error"); } finally { clearTimeout(tm); }
+  if (!r.ok) { let why = "HTTP " + r.status; try { const j = await r.json(); if (j.reason) why += ": " + j.reason; } catch (e) {} throw new Error(why); }
+  const d = await r.json();
+  mem[k] = {t: now, d}; try { sessionStorage.setItem("wx:" + k, JSON.stringify(mem[k])); } catch (e) {}
+  return d;
+}
+function q(params) { return API + "?" + Object.entries(params).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&"); }
+const hasData = (d, v) => { const a = (Array.isArray(d) ? d : [d]); return a.every(x => x && x.minutely_15 && Array.isArray(x.minutely_15[v]) && x.minutely_15[v].slice(0, 8).every(y => y !== null)); };
+// Met Office UKV first, then Open-Meteo best match
+async function forecast(params, key) {
+  const errs = [];
+  for (const model of ["ukmo_seamless", "best_match"]) {
+    try {
+      const d = await getJSON(q(Object.assign({}, params, {models: model})), key + ":" + model);
+      if (hasData(d, "precipitation")) return {d, model};
+      errs.push(model + ": no data");
+    } catch (e) {
+      if (/HTTP 429/.test(e.message)) throw new Error("Open-Meteo's free usage limit was hit for a moment (HTTP 429) – wait a minute and tap refresh");
+      errs.push(model + ": " + e.message);
+    }
+  }
+  throw new Error(errs.join("; "));
+}
+const MODEL_NAME = {ukmo_seamless: "UK Met Office UKV 2 km", best_match: "Open-Meteo best match"};
+
+// ---------- series analysis ----------
+function slots(x) {
+  const m = x.minutely_15, off = x.utc_offset_seconds * 1000, now = Date.now();
+  const t = m.time.map(s => Date.parse(s + ":00Z") - off);
+  // precipitation in a 15-min slot is the total for the 15 minutes *before* the time stamp
+  let i0 = t.findIndex(v => v > now); if (i0 < 0) i0 = t.length - 1;
+  return {m, t, i0, now};
+}
+function runLength(arr, i0, test) { // minutes the state at i0 lasts, needing 2 slots (30 min) to count as a change
+  const s0 = test(arr[i0]);
+  for (let j = i0 + 1; j < arr.length; j++) {
+    if (test(arr[j]) !== s0 && (j + 1 >= arr.length || test(arr[j + 1]) !== s0)) return {state: s0, idx: j, min: (j - i0) * 15};
+  }
+  return {state: s0, idx: -1, min: 720};
+}
+function analysePoint(x) {
+  const {m, t, i0, now} = slots(x), c = x.current;
+  const isWet = v => v != null && v >= WET;
+  const rain = runLength(m.precipitation, i0, isWet);
+  const day = c ? !!c.is_day : true;
+  const sunTest = v => v != null && v >= SUNNY;
+  const sun = m.sunshine_duration ? runLength(m.sunshine_duration, i0, sunTest) : null;
+  const cloud = c ? c.cloud_cover : null;
+  const clearNight = !day && cloud != null && cloud < 30;
+  const minsAhead = j => j < 0 ? 720 : Math.max(15, Math.round((t[j] - 15 * 60000 - now) / 60000 / 15) * 15);
+  return {wet: rain.state, rainMin: rain.idx < 0 ? 720 : minsAhead(rain.idx), rainAt: rain.idx < 0 ? null : m.time[rain.idx], rainAtMs: rain.idx < 0 ? null : t[rain.idx] - 15 * 60000,
+    day, sunny: day && sun ? sun.state : false, sunMin: sun ? (sun.idx < 0 ? 720 : minsAhead(sun.idx)) : 0, sunAt: sun && sun.idx >= 0 ? m.time[sun.idx] : null, sunAtMs: sun && sun.idx >= 0 ? t[sun.idx] - 15 * 60000 : null,
+    clearNight, cloud, temp: c ? c.temperature_2m : null, code: c ? c.weather_code : null, i0, m, t};
+}
+function roundTime(ms) { // "16:30" in UK time, rounded to 15 min
+  const d = new Date(Math.round(ms / 9e5) * 9e5);
+  return new Intl.DateTimeFormat("en-GB", {timeZone: "Europe/London", hour: "2-digit", minute: "2-digit"}).format(d);
+}
+
+// ---------- location ----------
+function setPlace(p, save) {
+  S.place = p; S.seq++; window.__placeSeq = S.seq;
+  if (save) try { localStorage.setItem(LS, JSON.stringify(p)); } catch (e) {}
+  showPlaceLine(); run();
+}
+function showPlaceLine() {
+  const p = S.place; $("prompt").hidden = !!p;
+  if (!p) { msg(""); return; }
+  $("placeLine").className = "note";
+  $("placeLine").innerHTML = "Weather for <b>" + esc(p.name) + "</b>" + (p.saved ? " (last used)" : "") + " <a href='#' id='refreshPlace'>refresh</a> <a href='#' id='clearPlace'>clear</a>";
+  $("clearPlace").onclick = e => { e.preventDefault(); try { localStorage.removeItem(LS); } catch (x) {} S.place = null; ["nowCard", "spotCard", "mapCard", "tlCard"].forEach(id => $(id).hidden = true); showPlaceLine(); };
+  $("refreshPlace").onclick = e => { e.preventDefault(); Object.keys(mem).forEach(k => delete mem[k]); try { Object.keys(sessionStorage).filter(k => k.startsWith("wx:")).forEach(k => sessionStorage.removeItem(k)); } catch (x) {} run(); loadOverview(); };
+}
+$("nearBtn").onclick = () => {
+  if (!navigator.geolocation) { msg("This browser can't share your location. Type a postcode instead.", true); return; }
+  msg("Finding your location…");
+  navigator.geolocation.getCurrentPosition(pos => {
+    const p = {name: "your location", lat: +pos.coords.latitude.toFixed(4), lon: +pos.coords.longitude.toFixed(4)};
+    setPlace(p, true);
+    fetch("https://api.postcodes.io/postcodes?lon=" + p.lon + "&lat=" + p.lat + "&limit=1").then(r => r.json()).then(j => {
+      const x = j && j.result && j.result[0]; if (x && S.place === p) { p.name = (x.parish && !/unparished/i.test(x.parish) ? x.parish.replace(/ CP$/, "") + ", " : "") + x.postcode + " (your location)"; try { localStorage.setItem(LS, JSON.stringify(p)); } catch (e) {} showPlaceLine(); if (lastRender) lastRender(); }
+    }).catch(() => {});
+  }, e => msg((e.code === 1 ? "Location permission was refused" : "Couldn't get your location") + ". Type a postcode or town instead.", true),
+  {enableHighAccuracy: false, timeout: 15000, maximumAge: 0});
+};
+async function lookup(raw) {
+  raw = raw.trim(); if (!raw) return;
+  const pc = raw.toUpperCase().replace(/\s+/g, "");
+  msg("Looking up " + raw + "…");
+  try {
+    let url;
+    if (/^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$/.test(pc)) url = "https://api.postcodes.io/postcodes/" + pc;
+    else if (/^[A-Z]{1,2}\d[A-Z\d]?$/.test(pc)) url = "https://api.postcodes.io/outcodes/" + pc;
+    else url = "https://api.postcodes.io/places?limit=10&q=" + encodeURIComponent(raw);
+    const r = await fetch(url);
+    if (r.ok) {
+      const j = await r.json(); let x = j.result;
+      const w = raw.toLowerCase(), nm = p => [p.name_1, p.name_2].filter(Boolean).find(n => n.toLowerCase() === w) || (p.name_2_lang === "eng" ? p.name_2 : p.name_1);
+      if (Array.isArray(x)) { x = x.find(p => [p.name_1, p.name_2].some(n => (n || "").toLowerCase() === w) && /^(Town|City|Village|Suburban Area|Hamlet)/i.test(p.local_type || "")) || x.find(p => /^(Town|City)/i.test(p.local_type || "")) || x[0]; }
+      if (x && x.latitude) {
+        const area = x.county_unitary || x.region || "", n1 = x.name_1 ? nm(x) : null;
+        const name = n1 ? (area && !area.includes(n1) ? n1 + ", " + area : n1) : (x.postcode || x.outcode);
+        setPlace({name, lat: x.latitude, lon: x.longitude}, true); return;
+      }
+    }
+  } catch (e) {}
+  const T = await towns().catch(() => null);
+  if (T) { const t = T.find(t => t.name.toLowerCase() === raw.toLowerCase()); if (t) { setPlace({name: t.name, lat: t.lat, lon: t.lon}, true); return; } }
+  msg("Couldn't find \"" + raw + "\". Try a full postcode like M1 1AE, or a town name.", true);
+}
+$("placeGo").onclick = () => lookup($("placeInput").value);
+$("placeInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.target.blur(); lookup(e.target.value); } });
+RADII.forEach(r => { const b = document.createElement("button"); b.textContent = r + " mi"; b.dataset.r = r; if (r === S.radius) b.className = "on";
+  b.onclick = () => { S.radius = r; [...$("radBtns").children].forEach(x => x.classList.toggle("on", x === b)); runSpots(); }; $("radBtns").appendChild(b); });
+
+// ---------- towns ----------
+let townsP = null;
+function towns() {
+  if (!townsP) townsP = fetch("towns.json").then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(j => j.t.map(r => ({name: r[0], lat: r[1], lon: r[2], nation: j.nations[r[3]], pop: r[4]})));
+  return townsP;
+}
+function pickTowns(T, p, R) {
+  const minSep = Math.max(1.2, R / 7), out = [];
+  for (const t of T) { // sorted by population
+    const d = miles(p.lat, p.lon, t.lat, t.lon);
+    if (d > R || d < 0.8) continue;
+    if (out.some(o => miles(o.lat, o.lon, t.lat, t.lon) < minSep)) continue;
+    out.push(Object.assign({d}, t));
+    if (out.length >= 30) break;  // each place counts as one Open-Meteo call; keep well inside the free limits
+  }
+  return out;
+}
+
+// ---------- main search ----------
+let lastRender = null;
+async function run() {
+  const p = S.place; if (!p) return;
+  const seq = S.seq; showErr("");
+  $("nowCard").hidden = false; $("nowBody").innerHTML = "<span class='spinner'></span>Getting the forecast for " + esc(p.name) + "…";
+  $("tlCard").hidden = true;
+  const lat = p.lat.toFixed(3), lon = p.lon.toFixed(3);
+  const base = {latitude: lat, longitude: lon, timezone: "Europe/London", wind_speed_unit: "mph"};
+  try {
+    const [main, prob] = await Promise.all([
+      forecast(Object.assign({}, base, {
+        current: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day",
+        minutely_15: "precipitation,sunshine_duration,cloud_cover", forecast_minutely_15: 52,
+        hourly: "temperature_2m,precipitation,cloud_cover,weather_code,sunshine_duration", forecast_hours: 13,
+        daily: "sunrise,sunset", forecast_days: 2}), "here:" + lat + "," + lon),
+      getJSON(q(Object.assign({}, base, {hourly: "precipitation_probability", forecast_hours: 13, models: "best_match"})), "prob:" + lat + "," + lon).catch(() => null)
+    ]);
+    if (seq !== S.seq) return;
+    lastRender = () => renderNow(p, main, prob);
+    lastRender(); renderTimeline(main, prob);
+    window.__wx.here = {model: main.model, a: summary(analysePoint(main.d))};
+  } catch (e) {
+    if (seq !== S.seq) return;
+    $("nowCard").hidden = true;
+    showErr("Couldn't get the forecast right now (" + e.message + "). Nothing is shown rather than guessing. Please try again in a minute.");
+    window.__wx.error = e.message;
+  }
+  runSpots();
+  radarSample(p);
+}
+function summary(a) { return {wet: a.wet, rainMin: a.rainMin, rainAt: a.rainAtMs ? roundTime(a.rainAtMs) : null, sunny: a.sunny, sunMin: a.sunMin, day: a.day, temp: a.temp, cloud: a.cloud, code: a.code}; }
+
+function confidence(min, prob) {
+  let lvl = min <= 120 ? "Fairly confident" : min <= 360 ? "Moderate confidence" : "Rough guess";
+  return lvl + (min < 720 ? ": timings can be out by 30–60 minutes, more for showers." : ".");
+}
+function renderNow(p, main, prob) {
+  const x = main.d, c = x.current, a = analysePoint(x);
+  const w = wmo(c.weather_code, c.is_day);
+  const probAt = ms => { if (!prob || !prob.hourly) return null; const off = prob.utc_offset_seconds * 1000; const i = prob.hourly.time.findIndex(s => Date.parse(s + ":00Z") - off > ms - 3600e3); return i >= 0 ? prob.hourly.precipitation_probability[i] : null; };
+  let key, cls;
+  if (a.wet) {
+    key = a.rainMin >= 720 ? "Raining now, and likely to stay wet on and off for the next 12 hours" : "Raining now – should ease around " + roundTime(a.rainAtMs) + " (in about " + dur(a.rainMin) + ")";
+    cls = "key wet";
+  } else {
+    const pp = a.rainAtMs ? probAt(a.rainAtMs) : null;
+    const word = pp == null ? "rain expected" : pp >= 60 ? "rain likely" : pp >= 30 ? "rain possible" : "a little rain possible";
+    key = a.rainMin >= 720 ? "Dry now, and staying dry for the next 12 hours" : "Dry for about " + dur(a.rainMin) + " – " + word + " from " + roundTime(a.rainAtMs) + (pp != null ? " (" + pp + "% chance that hour)" : "");
+    cls = "key";
+  }
+  let sunLine;
+  const sr = x.daily && x.daily.sunrise ? x.daily.sunrise.map(hm) : [], ss = x.daily && x.daily.sunset ? x.daily.sunset.map(hm) : [];
+  if (c.is_day) {
+    if (a.sunny) sunLine = "☀️ Sunny now" + (a.sunMin >= 720 || !a.sunAt ? " until sunset (" + (ss[0] || "") + ")" : ", clouding over around " + roundTime(a.sunAtMs));
+    else sunLine = (c.cloud_cover >= 85 ? "☁️ Overcast" : "⛅ Cloudy") + " (" + c.cloud_cover + "% cloud)" + (a.sunAt ? ", sunny spells from about " + roundTime(a.sunAtMs) : ", no real sunshine expected before sunset (" + (ss[0] || "") + ")");
+  } else {
+    const firstSun = a.sunAt ? roundTime(a.sunAtMs) : null;
+    sunLine = "🌙 Dark now (" + (c.cloud_cover < 30 ? "clear skies" : c.cloud_cover + "% cloud") + "). Sunrise " + (sr[1] && sr[0] < hm(c.time) ? sr[1] : sr[0] || "") + (firstSun ? ", first sunshine around " + firstSun : ", little sunshine expected in the next 12 hours");
+  }
+  const sign = c.wind_direction_10m != null ? compass((c.wind_direction_10m + 180) % 360) : "";
+  const fromDir = c.wind_direction_10m != null ? compass(c.wind_direction_10m) : "";
+  $("nowCard").style.borderColor = a.wet ? "var(--rain)" : (a.sunny ? "var(--sun)" : "var(--dry)");
+  $("nowBody").innerHTML =
+    "<div class='note'>Right now at " + esc(p.name) + " · " + hm(c.time) + "</div>" +
+    "<div class='nowtop'><div class='big'>" + w.ic + "</div><div><div class='nowstate'>" + (a.wet ? "Raining" : "Dry") + "</div><div class='nowsub'>" + esc(w.txt) + " · " + c.cloud_cover + "% cloud</div></div>" +
+    "<div class='temp'>" + Math.round(c.temperature_2m) + "°C<small>feels " + Math.round(c.apparent_temperature) + "°C</small></div></div>" +
+    "<div class='" + cls + "' id='keyLine'>" + esc(key) + "</div>" +
+    "<div class='line2' id='sunLine'>" + esc(sunLine) + "</div>" +
+    "<div class='chips'><span class='chip'>💨 Wind " + Math.round(c.wind_speed_10m) + " mph from the " + fromDir + ", gusts " + Math.round(c.wind_gusts_10m) + "</span>" +
+    "<span class='chip'>🌧️ " + c.precipitation.toFixed(1) + " mm last 15 min</span></div>" +
+    "<div id='radarLine' class='line2 note'></div>" +
+    "<div class='conf'>" + esc(confidence(a.rainMin)) + " Source: " + MODEL_NAME[main.model] + " forecast (hourly model, smoothed to 15-minute steps by Open-Meteo)" + (main.model === "ukmo_seamless" ? "; Met Office open data arrives a few hours after each model run" : "") + ". Updated " + new Intl.DateTimeFormat("en-GB", {timeZone: "Europe/London", hour: "2-digit", minute: "2-digit"}).format(new Date()) + ".</div>";
+  if (radarInfo && radarInfo.forName === p.name) showRadarLine();
+}
+function renderTimeline(main, prob) {
+  const h = main.d.hourly; if (!h) return;
+  const off = main.d.utc_offset_seconds * 1000, now = Date.now();
+  let start = h.time.findIndex(s => Date.parse(s + ":00Z") - off + 3600e3 > now); if (start < 0) start = 0;
+  const pp = {}; if (prob && prob.hourly) prob.hourly.time.forEach((t, i) => pp[t] = prob.hourly.precipitation_probability[i]);
+  let html = "";
+  const maxP = Math.max(1, ...h.precipitation.slice(start, start + 12));
+  for (let i = start; i < Math.min(h.time.length, start + 12); i++) {
+    const t = h.time[i], tm = Date.parse(t + ":00Z") - off;
+    const hour = +t.slice(11, 13), day = main.d.daily ? isDay(main.d, t) : hour >= 7 && hour < 19;
+    const w = wmo(h.weather_code[i], day), mm = h.precipitation[i] || 0, sun = Math.round((h.sunshine_duration[i] || 0) / 60);
+    html += "<div class='hr" + (i === start ? " now" : "") + "' title='" + esc(w.txt) + "'><div class='t'>" + (i === start ? "Now" : hm(t)) + "</div><div class='ic'>" + w.ic + "</div><div>" + Math.round(h.temperature_2m[i]) + "°</div>" +
+      "<div class='bar'><i style='height:" + (mm > 0 ? Math.max(3, Math.round(mm / maxP * 40)) : 0) + "px'></i></div><div>" + (mm >= 0.05 ? mm.toFixed(1) + " mm" : "dry") + "</div>" +
+      "<div class='pp'>" + (pp[t] != null ? pp[t] + "%" : "") + "</div><div class='note'>☁️ " + h.cloud_cover[i] + "%</div><div class='note'>" + (day ? "☀️ " + sun + "m" : "night") + "</div></div>";
+  }
+  $("tl").innerHTML = html; $("tlCard").hidden = false;
+  $("tlTitle").textContent = "Next 12 hours at " + S.place.name;
+}
+function isDay(d, t) { const sr = d.daily.sunrise, ss = d.daily.sunset; for (let k = 0; k < sr.length; k++) { if (t.slice(0, 10) === sr[k].slice(0, 10)) return t >= sr[k].slice(0, 13) + ":00" && t < ss[k]; } return true; }
+
+// ---------- nearest dry / sunny ----------
+let spotData = null;
+async function runSpots() {
+  const p = S.place; if (!p) return;
+  const seq = S.seq, R = S.radius;
+  $("spotCard").hidden = false; $("mapCard").hidden = false;
+  $("spotTitle").textContent = "Nearest dry and sunny places within " + R + " miles";
+  $("spotBody").innerHTML = "<span class='spinner'></span>Checking places around " + esc(p.name) + "…";
+  try {
+    const T = await towns();
+    const pts = pickTowns(T, p, R);
+    if (!pts.length) throw new Error("no places found in range");
+    const res = await forecast({latitude: pts.map(t => t.lat).join(","), longitude: pts.map(t => t.lon).join(","), timezone: "Europe/London",
+      current: "precipitation,cloud_cover,weather_code,is_day,temperature_2m", minutely_15: "precipitation,sunshine_duration", forecast_minutely_15: 48}, "spots:" + p.lat.toFixed(3) + "," + p.lon.toFixed(3) + ":" + R);
+    if (seq !== S.seq || R !== S.radius) return;
+    const arr = Array.isArray(res.d) ? res.d : [res.d];
+    pts.forEach((t, i) => { t.a = analysePoint(arr[i]); t.where = where(p, t); });
+    spotData = {pts, model: res.model, R};
+    renderSpots();
+    drawMap();
+  } catch (e) {
+    if (seq !== S.seq) return;
+    $("spotBody").innerHTML = "<div class='err'>Couldn't check nearby places (" + esc(e.message) + "). Nothing shown rather than guessing; try again shortly.</div>";
+  }
+}
+function spotLi(t, txt, col) { return "<li data-n='" + esc(t.name) + "'><i class='dotc' style='background:" + col + "'></i><div class='sname'><b>" + esc(t.name) + "</b><span>" + esc(txt) + "</span></div><div class='sdist'>" + esc(t.where) + "</div></li>"; }
+const colOf = a => a.wet ? "var(--rain)" : a.sunny ? "var(--sun)" : a.clearNight ? "#5b6b8c" : "var(--dry)";
+function renderSpots() {
+  const {pts, model, R} = spotData, here = window.__wx.here && window.__wx.here.a;
+  const dry = pts.filter(t => !t.a.wet), wet = pts.filter(t => t.a.wet);
+  const byDist = (x, y) => x.d - y.d;
+  let h = "<div class='note'>" + pts.length + " places checked · " + dry.length + " dry, " + wet.length + " raining now</div>";
+  h += "<h3>Nearest dry places</h3>";
+  const nd = dry.slice().sort(byDist).slice(0, 5);
+  h += nd.length ? "<ul class='spots'>" + nd.map(t => spotLi(t, (t.a.rainMin >= 720 ? "Dry for 12 h+" : "Dry for about " + dur(t.a.rainMin) + ", rain from " + roundTime(t.a.rainAtMs)) + (t.a.temp != null ? " · " + Math.round(t.a.temp) + "°C" : ""), colOf(t.a))).join("") + "</ul>" : "<div class='note'>Nowhere within " + R + " miles is dry right now. Try a bigger radius.</div>";
+  const longest = dry.slice().sort((x, y) => y.a.rainMin - x.a.rainMin || x.d - y.d).slice(0, 3);
+  if (longest.length) h += "<h3>Staying dry longest</h3><ul class='spots'>" + longest.map(t => spotLi(t, t.a.rainMin >= 720 ? "Dry for 12 h+" : "Dry for about " + dur(t.a.rainMin), colOf(t.a))).join("") + "</ul>";
+  const anyDay = pts.some(t => t.a.day);
+  if (anyDay) {
+    const sunny = pts.filter(t => t.a.sunny && !t.a.wet).sort(byDist).slice(0, 5);
+    h += "<h3>Nearest sunny places</h3>" + (sunny.length ? "<ul class='spots'>" + sunny.map(t => spotLi(t, t.a.sunMin >= 720 ? "Sunny until sunset" : "Sunny for about " + dur(t.a.sunMin), "var(--sun)")).join("") + "</ul>" : "<div class='note'>No sunshine anywhere within " + R + " miles right now.</div>");
+    const soon = pts.filter(t => !t.a.sunny && t.a.sunAtMs).sort((x, y) => x.a.sunAtMs - y.a.sunAtMs || x.d - y.d)[0];
+    if (!sunny.length && soon) h += "<div class='note'>First sunshine expected: " + esc(soon.name) + " (" + esc(soon.where) + ") around " + roundTime(soon.a.sunAtMs) + ".</div>";
+  } else {
+    const clear = pts.filter(t => t.a.clearNight && !t.a.wet).sort(byDist).slice(0, 5);
+    h += "<h3>Nearest clear skies (it's dark now)</h3>" + (clear.length ? "<ul class='spots'>" + clear.map(t => spotLi(t, t.a.cloud + "% cloud", "#5b6b8c")).join("") + "</ul>" : "<div class='note'>Cloudy everywhere within " + R + " miles. Sunny spots will show here after sunrise.</div>");
+  }
+  if (here && here.wet && nd[0]) h = "<div class='key' style='margin-top:0'>Nearest dry: " + esc(nd[0].name) + ", " + esc(nd[0].where) + " – " + (nd[0].a.rainMin >= 720 ? "dry for 12 h+" : "dry for about " + dur(nd[0].a.rainMin)) + "</div>" + h;
+  h += "<div class='conf'>Model: " + MODEL_NAME[model] + ". Each place is checked at its centre.</div>";
+  $("spotBody").innerHTML = h;
+  window.__wx.spots = {n: pts.length, dry: dry.length, wet: wet.length, nearestDry: nd.map(t => ({name: t.name, where: t.where, rainMin: t.a.rainMin})), model};
+}
+$("spotBody").addEventListener("click", e => { const li = e.target.closest("li[data-n]"); if (!li || !spotData) return; const t = spotData.pts.find(x => x.name === li.dataset.n); if (t) { ensureMap(); if (map) { $("mapCard").scrollIntoView({behavior: "smooth", block: "center"}); map.setView([t.lat, t.lon], 10); const m = spotMarkers[t.name]; if (m) setTimeout(() => m.openPopup(), 400); } } });
+
+// ---------- map + radar ----------
+let map = null, spotLayer = null, radarLayers = [], radarFrames = [], radarIdx = 0, playT = null, spotMarkers = {}, circle = null, hereM = null;
+function ensureMap() {
+  if (map || !window.L) return;
+  map = L.map("map", {scrollWheelZoom: false}).setView([54.5, -3], 6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 18, attribution: "© OpenStreetMap contributors"}).addTo(map);
+  spotLayer = L.layerGroup().addTo(map);
+  loadRadar();
+}
+async function loadRadar() {
+  try {
+    const j = await getJSON("https://api.rainviewer.com/public/weather-maps.json", "rainviewer");
+    radarFrames = (j.radar.past || []).concat(j.radar.nowcast || []).map(f => Object.assign({host: j.host}, f));
+    if (!radarFrames.length) throw new Error("no frames");
+    radarLayers = radarFrames.map(f => L.tileLayer(f.host + f.path + "/256/{z}/{x}/{y}/2/1_1.png", {opacity: 0, maxNativeZoom: 7, maxZoom: 18, zIndex: 10, attribution: "Radar © RainViewer", crossOrigin: true}));
+    const sl = $("radarSlider"); sl.max = radarFrames.length - 1; sl.value = radarFrames.length - 1;
+    showFrame(radarFrames.length - 1);
+  } catch (e) { $("radarTime").textContent = "Radar unavailable (" + e.message + ")"; }
+}
+function showFrame(i) {
+  radarIdx = i;
+  radarLayers.forEach((l, k) => { if (k === i) { if (!map.hasLayer(l)) l.addTo(map); l.setOpacity(.65); } else if (map.hasLayer(l)) l.setOpacity(0); });
+  const f = radarFrames[i], t = new Intl.DateTimeFormat("en-GB", {timeZone: "Europe/London", hour: "2-digit", minute: "2-digit"}).format(new Date(f.time * 1000));
+  $("radarTime").textContent = "Radar " + t + (i === radarFrames.length - 1 ? " (latest)" : "");
+}
+$("radarSlider").oninput = e => { stopPlay(); showFrame(+e.target.value); };
+function stopPlay() { if (playT) { clearInterval(playT); playT = null; $("playBtn").textContent = "▶"; } }
+$("playBtn").onclick = () => { if (!radarLayers.length) return; if (playT) return stopPlay(); $("playBtn").textContent = "⏸"; let i = 0; showFrame(0); $("radarSlider").value = 0;
+  playT = setInterval(() => { i++; if (i >= radarFrames.length) { stopPlay(); return; } showFrame(i); $("radarSlider").value = i; }, 700); };
+function drawMap() {
+  ensureMap(); if (!map || !spotData) return;
+  const p = S.place; spotLayer.clearLayers(); spotMarkers = {};
+  if (circle) circle.remove(); circle = L.circle([p.lat, p.lon], {radius: spotData.R * 1609.34, color: "#0b5cad", weight: 1, fill: false, dashArray: "4 4"}).addTo(map);
+  if (hereM) hereM.remove(); hereM = L.circleMarker([p.lat, p.lon], {radius: 9, weight: 3, color: "#0b5cad", fillColor: "#fff", fillOpacity: 1}).bindTooltip(p.name).addTo(map);
+  const css = getComputedStyle(document.documentElement);
+  const col = a => a.wet ? css.getPropertyValue("--rain") : a.sunny ? css.getPropertyValue("--sun") : a.clearNight ? "#5b6b8c" : css.getPropertyValue("--dry");
+  spotData.pts.forEach(t => {
+    const a = t.a, txt = a.wet ? "Raining" + (a.rainMin < 720 ? ", easing ~" + roundTime(a.rainAtMs) : "") : "Dry" + (a.rainMin < 720 ? " until ~" + roundTime(a.rainAtMs) : " for 12 h+");
+    const m = L.circleMarker([t.lat, t.lon], {radius: 8, weight: 1, color: "#222", fillColor: col(a).trim(), fillOpacity: .95})
+      .bindPopup("<b>" + esc(t.name) + "</b> (" + esc(t.where) + ")<br>" + esc(txt) + (a.sunny ? "<br>☀️ Sunny" + (a.sunMin < 720 ? " for about " + dur(a.sunMin) : "") : "") + "<br>" + (a.temp != null ? Math.round(a.temp) + "°C · " : "") + a.cloud + "% cloud").addTo(spotLayer);
+    spotMarkers[t.name] = m;
+  });
+  map.fitBounds(circle.getBounds(), {padding: [10, 10]});
+  window.__wx.mapMarkers = spotData.pts.length;
+}
+
+// radar check at the chosen spot: is the latest radar frame showing rain here / nearby?
+let radarInfo = null;
+async function radarSample(p) {
+  radarInfo = null;
+  try {
+    const j = await getJSON("https://api.rainviewer.com/public/weather-maps.json", "rainviewer");
+    const f = (j.radar.past || []).slice(-1)[0]; if (!f) return;
+    const z = 7, n = 2 ** z * 256, latR = p.lat * Math.PI / 180;
+    const px = (p.lon + 180) / 360 * n, py = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n;
+    const tx0 = Math.floor((px - 64) / 256), ty0 = Math.floor((py - 64) / 256), tx1 = Math.floor((px + 64) / 256), ty1 = Math.floor((py + 64) / 256);
+    const cv = document.createElement("canvas"); cv.width = (tx1 - tx0 + 1) * 256; cv.height = (ty1 - ty0 + 1) * 256; const g = cv.getContext("2d", {willReadFrequently: true});
+    const loads = [];
+    for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) loads.push(new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => { g.drawImage(im, (tx - tx0) * 256, (ty - ty0) * 256); res(); }; im.onerror = () => rej(new Error("tile")); im.src = j.host + f.path + "/256/" + z + "/" + tx + "/" + ty + "/2/0_0.png"; }));
+    await Promise.all(loads);
+    const cx = Math.round(px - tx0 * 256), cy = Math.round(py - ty0 * 256);
+    const R = 40, data = g.getImageData(cx - R, cy - R, 2 * R + 1, 2 * R + 1).data;
+    const kmPerPx = 40075 * Math.cos(latR) / n;
+    let hereRain = false, best = null;
+    for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
+      const a = data[((y + R) * (2 * R + 1) + (x + R)) * 4 + 3]; if (a < 40) continue;
+      const dkm = Math.hypot(x, y) * kmPerPx;
+      if (dkm <= 2) hereRain = true;
+      if (!best || dkm < best.d) best = {d: dkm, x, y};
+    }
+    const t = new Intl.DateTimeFormat("en-GB", {timeZone: "Europe/London", hour: "2-digit", minute: "2-digit"}).format(new Date(f.time * 1000));
+    radarInfo = {forName: p.name, time: t, hereRain, nearest: best ? {mi: best.d / 1.609, dir: compass((Math.atan2(best.x, -best.y) * 180 / Math.PI + 360) % 360)} : null, rangeMi: Math.round(R * kmPerPx / 1.609)};
+    window.__wx.radar = radarInfo;
+    showRadarLine();
+  } catch (e) { window.__wx.radar = {error: e.message}; }
+}
+function showRadarLine() {
+  const el = $("radarLine"); if (!el || !radarInfo || !S.place || radarInfo.forName !== S.place.name) return;
+  const r = radarInfo, here = window.__wx.here && window.__wx.here.a;
+  let t = "📡 Radar at " + r.time + ": ";
+  if (r.hereRain) t += "rain showing at this spot.";
+  else if (r.nearest) t += "no rain right here; nearest rain about " + Math.max(1, Math.round(r.nearest.mi)) + " mi " + r.nearest.dir + ".";
+  else t += "no rain within about " + r.rangeMi + " miles.";
+  if (here && here.wet && !r.hereRain) t += " The model says light rain, but radar doesn't see any, so it may be drier than forecast.";
+  if (here && !here.wet && r.hereRain) t += " The model says dry, but radar shows rain, so treat the forecast with caution.";
+  el.textContent = t;
+}
+
+// ---------- UK overview ----------
+const CITIES = [["London", 51.507, -0.128], ["Brighton", 50.828, -0.139], ["Southampton", 50.904, -1.404], ["Exeter", 50.726, -3.527], ["Plymouth", 50.372, -4.143], ["Bristol", 51.455, -2.597],
+  ["Cardiff", 51.481, -3.18], ["Swansea", 51.621, -3.943], ["Aberystwyth", 52.415, -4.083], ["Birmingham", 52.481, -1.9], ["Norwich", 52.628, 1.299], ["Cambridge", 52.205, 0.119],
+  ["Nottingham", 52.954, -1.15], ["Manchester", 53.481, -2.237], ["Liverpool", 53.411, -2.978], ["Leeds", 53.796, -1.548], ["Hull", 53.745, -0.335], ["Lancaster", 54.047, -2.801],
+  ["Newcastle", 54.973, -1.614], ["Carlisle", 54.892, -2.932], ["Glasgow", 55.865, -4.258], ["Edinburgh", 55.952, -3.196], ["Aberdeen", 57.144, -2.098], ["Inverness", 57.48, -4.224], ["Belfast", 54.597, -5.925]];
+async function loadOverview() {
+  $("ovTitle").textContent = "UK right now (" + CITIES.length + " cities)";
+  try {
+    const res = await forecast({latitude: CITIES.map(c => c[1]).join(","), longitude: CITIES.map(c => c[2]).join(","), timezone: "Europe/London",
+      current: "precipitation,cloud_cover,weather_code,is_day,temperature_2m", minutely_15: "precipitation,sunshine_duration", forecast_minutely_15: 48}, "overview");
+    const arr = Array.isArray(res.d) ? res.d : [res.d];
+    const rows = CITIES.map((c, i) => ({name: c[0], lat: c[1], lon: c[2], a: analysePoint(arr[i])}));
+    const dry = rows.filter(r => !r.a.wet).length;
+    let h = "<div class='note' style='margin-bottom:6px'><b>" + dry + " of " + rows.length + "</b> cities dry right now · " + MODEL_NAME[res.model] + " · " + hm(arr[0].current.time) + "</div><table class='ov'><tr><th>City</th><th>Now</th><th>Next change</th><th>°C</th></tr>";
+    rows.forEach(r => { const a = r.a, w = wmo(a.code, a.day);
+      const st = a.wet ? "<span class='st-rain'>Raining</span>" : a.sunny ? "<span class='st-sun'>Sunny</span>" : "<span class='st-dry'>Dry</span>";
+      const nx = a.wet ? (a.rainMin >= 720 ? "wet 12 h+" : "eases ~" + roundTime(a.rainAtMs)) : (a.rainMin >= 720 ? "dry 12 h+" : "rain ~" + roundTime(a.rainAtMs));
+      h += "<tr><td>" + esc(r.name) + "</td><td>" + w.ic + " " + st + "</td><td>" + nx + "</td><td>" + (a.temp != null ? Math.round(a.temp) : "") + "</td></tr>"; });
+    $("ovBody").innerHTML = h + "</table>";
+    window.__wx.overview = {dry, n: rows.length, rows: rows.map(r => ({name: r.name, wet: r.a.wet, sunny: r.a.sunny}))};
+  } catch (e) { $("ovBody").innerHTML = "<div class='err'>Couldn't load the UK overview (" + esc(e.message) + "). Try again in a minute.</div>"; window.__wx.overviewError = e.message; }
+}
+
+// ---------- start ----------
+try { const p = JSON.parse(localStorage.getItem(LS) || "null"); if (p && isFinite(p.lat) && isFinite(p.lon)) { p.saved = true; S.place = p; } } catch (e) {}
+showPlaceLine();
+loadOverview();
+const startMapWhenReady = () => { if (window.L) { if (S.place && spotData) drawMap(); } else setTimeout(startMapWhenReady, 200); };
+if (S.place) run();
+window.addEventListener("load", () => { startMapWhenReady(); if ("requestIdleCallback" in window) requestIdleCallback(() => towns()); else setTimeout(towns, 1500); });
+})();
+</script>
+</body>
+</html>
