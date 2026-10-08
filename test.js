@@ -63,6 +63,7 @@ const PLACES = {Parbold: [53.5920, -2.7708], Glasgow: [55.8642, -4.2518], London
     await p.reload({waitUntil: 'domcontentloaded'}); await p.waitForFunction(() => window.__wx.here, null, {timeout: 30000});
     ok(/last used/.test(await p.textContent('#placeLine')), `${name}: last location remembered`);
     await p.evaluate(() => window.scrollTo(0, 0)); await p.waitForTimeout(500);
+    await p.screenshot({path: PRE === 'live' ? `shots/${name}-live.png` : `shots/${PRE}-${name}.png`});
     if (name === 'mobile') { const sw = await p.evaluate(() => document.documentElement.scrollWidth); ok(sw <= 392, `mobile: no sideways scroll (${sw})`); }
     ok(errs.length === 0, `${name}: no console errors ${errs.join(' | ')}`);
     ok(bad.length === 0, `${name}: no failed requests ${bad.join(' | ')}`);

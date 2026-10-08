@@ -194,7 +194,9 @@ async function forecast(params, key) {
       if (hasData(d, "precipitation")) return {d, model};
       errs.push(model + ": no data");
     } catch (e) {
-      if (/HTTP 429/.test(e.message)) throw new Error("Open-Meteo's free usage limit was hit for a moment (HTTP 429) – wait a minute and tap refresh");
+      if (/HTTP 429/.test(e.message)) throw new Error(/daily/i.test(e.message)
+        ? "Open-Meteo's free daily limit has been reached for this internet connection (HTTP 429). Try again later, or switch between Wi-Fi and mobile data"
+        : "Open-Meteo's free usage limit was hit for a moment (HTTP 429) – wait a minute and tap refresh");
       errs.push(model + ": " + e.message);
     }
   }
