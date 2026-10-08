@@ -310,6 +310,16 @@ function pickTowns(T, p, R) {
     out.push(Object.assign({d}, t));
     if (out.length >= 30) break;  // each place counts as one Open-Meteo call; keep well inside the free limits
   }
+  // sparse areas (Highlands, islands, moors): top up with points on two rings around you
+  if (out.length < 12) {
+    for (const f of [0.5, 1]) for (let b = 0; b < 360; b += 45) {
+      const d = R * f, t = Math.PI / 180, dLat = d / 69.05 * Math.cos(b * t), dLon = d / (69.05 * Math.cos(p.lat * t)) * Math.sin(b * t);
+      const g = {lat: +(p.lat + dLat).toFixed(3), lon: +(p.lon + dLon).toFixed(3)};
+      if (out.some(o => miles(o.lat, o.lon, g.lat, g.lon) < minSep)) continue;
+      g.d = miles(p.lat, p.lon, g.lat, g.lon); g.name = (d < 10 ? d.toFixed(1) : Math.round(d)) + " mi " + compass(b) + " of here"; g.grid = true;
+      out.push(g);
+    }
+  }
   return out;
 }
 
@@ -439,7 +449,7 @@ function renderSpots() {
   const {pts, model, R} = spotData, here = window.__wx.here && window.__wx.here.a;
   const dry = pts.filter(t => !t.a.wet), wet = pts.filter(t => t.a.wet);
   const byDist = (x, y) => x.d - y.d;
-  let h = "<div class='note'>" + pts.length + " places checked · " + dry.length + " dry, " + wet.length + " raining now</div>";
+  let h = "<div class='note'>" + pts.length + (pts.length === 1 ? " place" : " places") + " checked · " + dry.length + " dry, " + wet.length + " raining now</div>";
   h += "<h3>Nearest dry places</h3>";
   const nd = dry.slice().sort(byDist).slice(0, 5);
   h += nd.length ? "<ul class='spots'>" + nd.map(t => spotLi(t, (t.a.rainMin >= 720 ? "Dry for 12 h+" : "Dry for about " + dur(t.a.rainMin) + ", rain from " + roundTime(t.a.rainAtMs)) + (t.a.temp != null ? " · " + Math.round(t.a.temp) + "°C" : ""), colOf(t.a))).join("") + "</ul>" : "<div class='note'>Nowhere within " + R + " miles is dry right now. Try a bigger radius.</div>";
